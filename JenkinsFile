@@ -1,6 +1,9 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'NodeJs'  
+    }
     environment {
         DOCKER_IMAGE = "react-app"
         CONTAINER_NAME = "priceless_hawking"

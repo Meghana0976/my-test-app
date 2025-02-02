@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "react-app"
+        CONTAINER_NAME = "priceless_hawking"
+        SERVER_IP = "52.70.35.149"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Meghana0976/my-test-app'
+            }
+        }
+
+        stage('Build React App') {
+            steps {
+                sh 'npm install'
+                sh 'npm start'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $DOCKER_IMAGE .'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withDockerRegistry([credentialsId: 'docker-hub-credentials', url: '']) {
+                    sh 'docker tag $DOCKER_IMAGE your-dockerhub-username/$DOCKER_IMAGE:latest'
+                    sh 'docker push your-dockerhub-username/$DOCKER_IMAGE:latest'
+                }
+            }
+        }
+
+        stage('Deploy on EC2') {
+            steps {
+                sshagent(['ec2-ssh-credentials']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ubuntu@$SERVER_IP << EOF
+                        docker stop $CONTAINER_NAME || true
+                        docker rm $CONTAINER_NAME || true
+                        docker pull your-dockerhub-username/$DOCKER_IMAGE:latest
+                        docker run -d -p 3000:3000 --name $CONTAINER_NAME your-dockerhub-username/$DOCKER_IMAGE:latest
+                        EOF
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Deployment Successful!'
+        }
+        failure {
+            echo 'Deployment Failed!'
+        }
+    }
+}
